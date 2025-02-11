@@ -35,20 +35,12 @@ def is_suitable_for_work(image):
     avg_s = sum(pixel / 255.0 for pixel in s.getdata()) / total_pixels
     avg_v = sum(pixel / 255.0 for pixel in v.getdata()) / total_pixels
 
-    # # 条件1：平均饱和度不宜过高
-    # if avg_s > 0.6:
-    #     return False
-
-    # # 条件2：明度不宜过低或过高
-    # if avg_v < 0.3 or avg_v > 0.9:
-    #     return False
-
     # 条件3：检测高红色区域（R>200且G,B<100）
     red_count = 0
     for r, g, b in image.getdata():
         if r > 200 and g < 100 and b < 100:
             red_count += 1
-    if red_count / total_pixels > 0.4:  # 超过40%的红色区域
+    if red_count / total_pixels > 0.2:  # 超过20%的红色区域
         return False
 
     # 条件4：检测肤色区域（H在0-30，S>=0.2，V>=0.4）
@@ -60,10 +52,13 @@ def is_suitable_for_work(image):
     for h_val, s_val, v_val in zip(h_data, s_data, v_data):
         if 0 <= h_val <= 30 and s_val >= 0.2 and v_val >= 0.4:
             skin_count += 1
-    if skin_count / total_pixels > 0.5:  # 超过50%的肤色区域
+    if skin_count / total_pixels > 0.1:  # 超过10%的肤色区域
         return False
 
     return True
+
+# 弹窗选择显示QQ用户头像还是QQ群头像
+choice = messagebox.askyesno("选择", "是否显示QQ群头像？\n(选择'是'显示群头像，选择'否'显示用户头像)")
 
 # 弹窗输入QQ号
 qq_number = simpledialog.askstring("输入QQ号", "请输入QQ号:")
@@ -71,8 +66,11 @@ qq_number = simpledialog.askstring("输入QQ号", "请输入QQ号:")
 if qq_number:
     if is_valid_qq(qq_number):
         try:
-            # 构造QQ头像的URL
-            image_url = f"https://q1.qlogo.cn/g?b=qq&nk={qq_number}&s=5"
+            # 根据用户选择构造不同的URL
+            if choice:
+                image_url = f"https://p.qlogo.cn/gh/{qq_number}/{qq_number}/640/"
+            else:
+                image_url = f"https://q1.qlogo.cn/g?b=qq&nk={qq_number}&s=5"
 
             # 发送HTTP请求获取图片
             response = requests.get(image_url)
@@ -84,7 +82,7 @@ if qq_number:
             # 判断头像是否适合在工作场合显示
             if not is_suitable_for_work(image):
                 # 如果不适合，询问用户是否继续显示
-                user_choice = messagebox.askyesno("警告", "此头像可能不适合在工作场合显示。是否继续显示？")
+                user_choice = messagebox.askyesno("警告", "此头像可能为NSFW内容(工作场合不宜)。是否继续显示？")
                 if not user_choice:
                     root.quit()
                     exit()
