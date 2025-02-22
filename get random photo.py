@@ -6,6 +6,7 @@ from tkinter import simpledialog, messagebox
 import os
 import cv2
 import numpy as np
+import datetime
 
 # 创建主窗口
 root = tk.Tk()
@@ -70,7 +71,7 @@ def get_image_with_retry(max_retries=5):
         try:
             print("正在获取图片...")
             # 获取图片
-            image_url = "https://image.anosu.top/pixiv/direct" # 这里是pixiv的API,当然你也可以换成其他的API
+            image_url = "https://image.anosu.top/pixiv/direct" # pixiv图片api
             response = requests.get(image_url)
             response.raise_for_status()  # 如果响应状态码不是200，抛出异常
             image = Image.open(BytesIO(response.content))
@@ -103,6 +104,20 @@ if not is_suitable_for_work(image):
 # 创建图片显示窗口
 image_window = tk.Toplevel()
 image_window.title("随机图片")
+
+image_dir = "image"
+os.makedirs(image_dir, exist_ok=True)  # 如果文件夹不存在则创建
+
+# 生成文件名
+current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+filename = os.path.join(image_dir, f"{current_time}.jpg")  # 保存到image文件夹中
+
+# 保存图片
+try:
+    image.save(filename)
+    print(f"图片已保存为: {filename}")
+except Exception as e:
+    print(f"保存失败: {str(e)}")
 
 # 转换并显示图片
 tk_image = ImageTk.PhotoImage(image)
