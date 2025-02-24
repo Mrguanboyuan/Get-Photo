@@ -62,8 +62,8 @@ def is_suitable_for_work(image):
     nsfw_prob = preds[0][1]
     print(f"[调试] NSFW概率值: {nsfw_prob:.4f}")
     
-    # 返回检测结果（概率阈值设为0.3）
-    return nsfw_prob < 0.3
+    # 返回检测结果（概率阈值设为0.2）
+    return nsfw_prob < 0.2
 
 def get_image_with_retry(max_retries=5):
     retries = 0
@@ -74,18 +74,19 @@ def get_image_with_retry(max_retries=5):
             image_url = "https://image.anosu.top/pixiv/direct" # pixiv图片api
             response = requests.get(image_url)
             response.raise_for_status()  # 如果响应状态码不是200，抛出异常
+            content_type = response.headers.get('Content-Type', '').lower()
             image = Image.open(BytesIO(response.content))
             print("图片获取成功,正在进行NSFW检测...")
-            return image
+            return image, content_type
         except requests.exceptions.RequestException as e:
             retries += 1
             print(f"图片获取失败，尝试重新获取 ({retries}/{max_retries})...")
             if retries >= max_retries:
                 print("图片获取失败，已达到最大重试次数，请检查您的网络或您给的图片URL是否正确。")
-                return None
+                return None, None
 
-# 获取图片
-image = get_image_with_retry()
+# 获取图片和Content-Type
+image, content_type = get_image_with_retry()
 
 if image is None:
     print("无法获取图片，程序退出。")
@@ -101,16 +102,36 @@ if not is_suitable_for_work(image):
         root.quit()
         exit()
 
-# 创建图片显示窗口
-image_window = tk.Toplevel()
-image_window.title("随机图片")
-
+# 创建保存目录
 image_dir = "image"
-os.makedirs(image_dir, exist_ok=True)  # 如果文件夹不存在则创建
+os.makedirs(image_dir, exist_ok=True)
+
+# 确定文件扩展名
+format_to_ext = {
+    'jpeg': 'jpg',
+    'jpg': 'jpg',
+    'png': 'png',
+    'gif': 'gif',
+    'webp': 'webp',
+}
+
+file_ext = 'jpg'  # 默认扩展名
+
+# 优先使用PIL检测的图片格式
+if image.format:
+    pil_format = image.format.lower()
+    file_ext = format_to_ext.get(pil_format, pil_format)
+else:
+    # 其次使用Content-Type判断
+    if content_type:
+        content_type_main = content_type.split(';')[0].strip().lower()
+        if content_type_main.startswith('image/'):
+            mime_type = content_type_main.split('/')[1]
+            file_ext = format_to_ext.get(mime_type, mime_type)
 
 # 生成文件名
 current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-filename = os.path.join(image_dir, f"{current_time}.jpg")  # 保存到image文件夹中
+filename = os.path.join(image_dir, f"{current_time}.{file_ext}")
 
 # 保存图片
 try:
@@ -119,12 +140,37 @@ try:
 except Exception as e:
     print(f"保存失败: {str(e)}")
 
-# 转换并显示图片
-tk_image = ImageTk.PhotoImage(image)
+# 创建图片显示窗口
+image_window = tk.Toplevel()
+image_window.title("随机图片")
+
+# 调整图片大小以适应屏幕
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+img_width, img_height = image.size
+
+# 计算缩放比例（仅在图片尺寸超过屏幕时缩放）
+if img_width > screen_width or img_height > screen_height:
+    width_ratio = screen_width / img_width
+    height_ratio = screen_height / img_height
+    scale_ratio = min(width_ratio, height_ratio)
+    new_width = int(img_width * scale_ratio)
+    new_height = int(img_height * scale_ratio)
+else:
+    new_width, new_height = img_width, img_height
+
+# 高质量缩放
+resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+tk_image = ImageTk.PhotoImage(resized_image)
+
+# 设置窗口最大尺寸为屏幕尺寸
+image_window.maxsize(screen_width, screen_height)
+
+# 显示图片
 label = tk.Label(image_window, image=tk_image)
 label.pack()
 
-# 窗口关闭处理
+# 窗口关闭处理（保持不变）
 def on_closing():
     root.quit()
 
